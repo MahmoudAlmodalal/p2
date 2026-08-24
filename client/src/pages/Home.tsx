@@ -1,380 +1,71 @@
 /**
- * Style reminder — «غرفة عمليات مالية»: editorial Arabic data hierarchy, asymmetric rail,
- * strong petroleum accents, and restrained status colors. Do not dilute it with generic cards.
+ * Style reminder — «غرفة عمليات مالية»: live, server-authoritative Arabic data in a
+ * persistent RTL command shell. Maintain the petroleum decision color and sharp hierarchy.
  */
 import { useMemo, useState } from "react";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  BarChart3,
-  Bell,
-  BookOpenCheck,
-  ChevronDown,
-  ChevronLeft,
-  CircleDollarSign,
-  Download,
-  FileText,
-  Landmark,
-  LayoutDashboard,
-  Menu,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Settings2,
-  ShieldCheck,
-  SlidersHorizontal,
-  UsersRound,
-  WalletCards,
-  X,
-} from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, BarChart3, Bell, BookOpenCheck, ChevronDown, ChevronLeft, CircleDollarSign, Download, FileText, Landmark, LayoutDashboard, LoaderCircle, Menu, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, UsersRound, WalletCards, X } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
+import { FinanceAccount, FinanceApiError, FinanceCurrency, FinancePortfolio, FinanceTransaction, TransactionKind, getFinanceLoginUrl, useFinanceData } from "@/lib/financeApi";
 
 type NavKey = "dashboard" | "portfolios" | "accounts" | "transactions" | "reports";
-type Currency = "ILS" | "USD";
-
-type Movement = {
-  id: number;
-  title: string;
-  category: string;
-  account: string;
-  amount: number;
-  kind: "income" | "expense" | "transfer";
-  date: string;
-  status: "منشورة" | "مسودة";
-};
-
 const navigation: { key: NavKey; label: string; icon: typeof LayoutDashboard }[] = [
-  { key: "dashboard", label: "نظرة عامة", icon: LayoutDashboard },
-  { key: "portfolios", label: "المحافظ", icon: WalletCards },
-  { key: "accounts", label: "الحسابات", icon: Landmark },
-  { key: "transactions", label: "الحركات", icon: BookOpenCheck },
-  { key: "reports", label: "التقارير", icon: BarChart3 },
+  { key: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { key: "portfolios", label: "المحافظ", icon: WalletCards }, { key: "accounts", label: "الحسابات", icon: Landmark }, { key: "transactions", label: "الحركات", icon: BookOpenCheck }, { key: "reports", label: "التقارير", icon: BarChart3 },
 ];
 
-const trendData = [
-  { label: "أب", value: 69800 },
-  { label: "أيل", value: 72500 },
-  { label: "ت1", value: 71600 },
-  { label: "ت2", value: 75200 },
-  { label: "كان1", value: 78800 },
-  { label: "كان2", value: 81500 },
-  { label: "ينا", value: 84200 },
-];
+const money = (value: string | number, currency: FinanceCurrency) => new Intl.NumberFormat("ar", { style: "currency", currency, maximumFractionDigits: currency === "ILS" ? 0 : 2 }).format(Number(value));
+const labelDate = (value: string) => new Intl.DateTimeFormat("ar", { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
 
-const seedMovements: Movement[] = [
-  { id: 1, title: "راتب شهر يناير", category: "دخل", account: "البنك العربي", amount: 9800, kind: "income", date: "27 يناير 2025", status: "منشورة" },
-  { id: 2, title: "تحويل إلى الادخار", category: "تحويل داخلي", account: "حساب الادخار", amount: 1500, kind: "transfer", date: "26 يناير 2025", status: "منشورة" },
-  { id: 3, title: "مشتريات المنزل", category: "منزل", account: "Visa Platinum", amount: 460, kind: "expense", date: "25 يناير 2025", status: "منشورة" },
-  { id: 4, title: "دفعة تأمين السيارة", category: "تنقّل", account: "البنك العربي", amount: 780, kind: "expense", date: "24 يناير 2025", status: "منشورة" },
-  { id: 5, title: "مكافأة عمل", category: "دخل", account: "البنك العربي", amount: 1250, kind: "income", date: "22 يناير 2025", status: "مسودة" },
-];
-
-const formatMoney = (value: number, currency: Currency) => {
-  const converted = currency === "USD" ? value / 3.65 : value;
-  return new Intl.NumberFormat("ar", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: currency === "ILS" ? 0 : 2,
-  }).format(converted);
-};
-
-function NavItem({
-  label,
-  Icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  Icon: typeof LayoutDashboard;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition-all duration-150 ease-out ${
-        active
-          ? "bg-[#0F5C5B] text-white shadow-[0_8px_20px_rgba(15,92,91,0.16)]"
-          : "text-[#506663] hover:bg-[#E9F0EE] hover:text-[#0F5C5B]"
-      }`}
-    >
-      <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 1.8} />
-      <span className="font-medium">{label}</span>
-      {active && <span className="mr-auto size-1.5 rounded-full bg-[#EEC66B]" />}
-    </button>
-  );
+function NavItem({ label, Icon, active, onClick }: { label: string; Icon: typeof LayoutDashboard; active: boolean; onClick: () => void }) {
+  return <button onClick={onClick} className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition-all duration-150 ease-out ${active ? "bg-[#0F5C5B] text-white shadow-[0_8px_20px_rgba(15,92,91,0.16)]" : "text-[#506663] hover:bg-[#E9F0EE] hover:text-[#0F5C5B]"}`}><Icon className="size-[18px]" strokeWidth={active ? 2.4 : 1.8} /><span className="font-medium">{label}</span>{active && <span className="mr-auto size-1.5 rounded-full bg-[#EEC66B]" />}</button>;
 }
 
-function MetricCard({
-  label,
-  value,
-  hint,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  tone: "teal" | "sage" | "amber";
-  icon: typeof CircleDollarSign;
-}) {
-  const tones = {
-    teal: "border-[#B7D8D2] bg-[#F1F8F6] text-[#0F5C5B]",
-    sage: "border-[#C7D7C2] bg-[#F4F8F1] text-[#52714E]",
-    amber: "border-[#ECD8AC] bg-[#FFF9ED] text-[#A66919]",
-  };
-  return (
-    <section className={`relative overflow-hidden rounded-2xl border p-4 ${tones[tone]}`}>
-      <div className="absolute inset-y-0 right-0 w-1 bg-current opacity-80" />
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="flex items-center gap-1.5 text-xs font-medium opacity-75"><span className="size-1.5 rounded-full bg-current" />{label}</p>
-          <p className="mt-2 font-[family-name:var(--font-display)] text-[19px] font-extrabold tracking-tight" dir="ltr">
-            {value}
-          </p>
-          <p className="mt-2 text-xs font-medium opacity-75">{hint}</p>
-        </div>
-        <span className="flex size-9 items-center justify-center rounded-xl bg-white/75 shadow-sm">
-          <Icon className="size-[18px]" strokeWidth={1.9} />
-        </span>
-      </div>
-    </section>
-  );
+function MetricCard({ label, value, hint, tone, icon: Icon }: { label: string; value: string; hint: string; tone: "teal" | "sage" | "amber"; icon: typeof CircleDollarSign }) {
+  const tones = { teal: "border-[#B7D8D2] bg-[#F1F8F6] text-[#0F5C5B]", sage: "border-[#C7D7C2] bg-[#F4F8F1] text-[#52714E]", amber: "border-[#ECD8AC] bg-[#FFF9ED] text-[#A66919]" };
+  return <section className={`relative overflow-hidden rounded-2xl border p-4 ${tones[tone]}`}><div className="absolute inset-y-0 right-0 w-1 bg-current opacity-80" /><div className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-1.5 text-xs font-medium opacity-75"><span className="size-1.5 rounded-full bg-current" />{label}</p><p className="mt-2 font-[family-name:var(--font-display)] text-[19px] font-extrabold tracking-tight" dir="ltr">{value}</p><p className="mt-2 text-xs font-medium opacity-75">{hint}</p></div><span className="flex size-9 items-center justify-center rounded-xl bg-white/75 shadow-sm"><Icon className="size-[18px]" strokeWidth={1.9} /></span></div></section>;
 }
 
-function StatusPill({ status }: { status: Movement["status"] }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status === "منشورة" ? "bg-[#EDF6F2] text-[#317460]" : "bg-[#FFF6E2] text-[#A86C17]"}`}>
-      <span className="size-1.5 rounded-full bg-current" />
-      {status}
-    </span>
-  );
-}
-
-function MovementIcon({ kind }: { kind: Movement["kind"] }) {
-  if (kind === "income") return <ArrowDownLeft className="size-[17px] text-[#2D8A64]" />;
-  if (kind === "expense") return <ArrowUpRight className="size-[17px] text-[#B6614B]" />;
-  return <ArrowDownLeft className="size-[17px] rotate-90 text-[#3B7D9C]" />;
-}
+function MovementIcon({ kind }: { kind: TransactionKind }) { return kind === "income" ? <ArrowDownLeft className="size-[17px] text-[#2D8A64]" /> : kind === "expense" ? <ArrowUpRight className="size-[17px] text-[#B6614B]" /> : <ArrowDownLeft className="size-[17px] rotate-90 text-[#3B7D9C]" />; }
+function StatusPill({ status }: { status: FinanceTransaction["status"] }) { const label = status === "posted" ? "منشورة" : status === "draft" ? "مسودة" : "ملغاة"; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status === "posted" ? "bg-[#EDF6F2] text-[#317460]" : status === "draft" ? "bg-[#FFF6E2] text-[#A86C17]" : "bg-[#F4F4F3] text-[#727875]"}`}><span className="size-1.5 rounded-full bg-current" />{label}</span>; }
 
 export default function Home() {
-  const [activeNav, setActiveNav] = useState<NavKey>("dashboard");
-  const [currency, setCurrency] = useState<Currency>("ILS");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [showDialog, setShowDialog] = useState(false);
-  const [query, setQuery] = useState("");
-  const [movements, setMovements] = useState<Movement[]>(seedMovements);
-  const [draft, setDraft] = useState({ title: "", amount: "", kind: "expense" as Movement["kind"] });
-
-  const visibleMovements = useMemo(
-    () => movements.filter((movement) => movement.title.includes(query) || movement.category.includes(query) || movement.account.includes(query)),
-    [movements, query],
-  );
-
-  const totalIncome = movements.filter((item) => item.kind === "income" && item.status === "منشورة").reduce((sum, item) => sum + item.amount, 0);
-  const totalExpense = movements.filter((item) => item.kind === "expense" && item.status === "منشورة").reduce((sum, item) => sum + item.amount, 0);
-
-  const addMovement = () => {
-    const amount = Number(draft.amount);
-    if (!draft.title.trim() || !amount || amount <= 0) {
-      toast.error("أدخل وصفاً ومبلغاً موجباً للحركة.");
-      return;
-    }
-    const category = draft.kind === "income" ? "دخل" : draft.kind === "transfer" ? "تحويل داخلي" : "مصروف متنوع";
-    setMovements((current) => [
-      {
-        id: Date.now(),
-        title: draft.title,
-        category,
-        account: draft.kind === "transfer" ? "حساب الادخار" : "البنك العربي",
-        amount,
-        kind: draft.kind,
-        date: "اليوم",
-        status: "منشورة",
-      },
-      ...current,
-    ]);
-    setDraft({ title: "", amount: "", kind: "expense" });
-    setShowDialog(false);
-    toast.success("تم ترحيل الحركة وتحديث الرصيد.");
-  };
-
-  const exportCsv = () => {
-    const rows = [
-      ["الوصف", "الفئة", "الحساب", "التاريخ", "الحالة", "المبلغ"],
-      ...visibleMovements.map((item) => [item.title, item.category, item.account, item.date, item.status, String(item.amount)]),
-    ];
-    const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n")}`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "حركات-محفظتي.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("تم تجهيز ملف CSV مطابق للحركات الظاهرة.");
-  };
-
+  const [activeNav, setActiveNav] = useState<NavKey>("dashboard"); const [mobileOpen, setMobileOpen] = useState(false); const [showDialog, setShowDialog] = useState(false); const [query, setQuery] = useState(""); const [currency, setCurrency] = useState<FinanceCurrency>("ILS");
+  const { workspace, accounts, portfolios, transactions, cashFlow, netWorth, loading, error, refresh, createAndPostTransaction } = useFinanceData();
+  const activeCurrency = netWorth?.currency ?? workspace?.workspace.default_currency ?? currency;
+  const visibleTransactions = useMemo(() => transactions.filter((item) => `${item.description} ${item.category_name ?? ""} ${item.source_account_name ?? ""} ${item.destination_account_name ?? ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())), [transactions, query]);
+  const cashAccounts = accounts.filter((account) => Number(account.current_balance) > 0); const liquidBalance = cashAccounts.reduce((sum, account) => sum + Number(account.current_balance), 0); const savingsBalance = accounts.filter((account) => account.type === "savings").reduce((sum, account) => sum + Number(account.current_balance), 0);
+  const trendData = useMemo(() => { let running = 0; return [...transactions].reverse().filter((item) => item.status === "posted").map((item) => { running += item.kind === "income" ? Number(item.amount) : item.kind === "expense" ? -Number(item.amount) : 0; return { label: new Intl.DateTimeFormat("ar", { month: "short", day: "numeric" }).format(new Date(`${item.occurred_on}T12:00:00`)), value: running }; }); }, [transactions]);
+  const exportCsv = () => { const rows = [["الوصف", "النوع", "الحساب", "التاريخ", "الحالة", "المبلغ"], ...visibleTransactions.map((item) => [item.description, item.kind, item.source_account_name ?? item.destination_account_name ?? "", item.occurred_on, item.status, item.amount])]; const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n")}`; const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "حركات-محفظتي.csv"; link.click(); URL.revokeObjectURL(url); };
+  const pickCurrency = (next: FinanceCurrency) => { setCurrency(next); void refresh(next).catch(() => undefined); };
   const currentTitle = navigation.find((item) => item.key === activeNav)?.label ?? "نظرة عامة";
 
-  return (
-    <div className="min-h-screen bg-[#F8F7F2] text-[#193331]" dir="rtl">
-      <aside className={`fixed inset-y-0 right-0 z-40 flex w-[276px] flex-col border-l border-[#DCE8E3] bg-[#FFFEFB] px-4 py-5 transition-transform duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="flex items-center justify-between px-2">
-          <button onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-[#5F7773] hover:bg-[#EFF4F1] lg:hidden" aria-label="إغلاق القائمة">
-            <X className="size-5" />
-          </button>
-          <div className="mr-auto flex items-center gap-2.5">
-            <span className="relative flex size-12 items-center justify-center rounded-2xl bg-[#E7F1EE] shadow-[inset_0_0_0_1px_rgba(15,92,91,.12)]"><img src="/manus-storage/mahfazati-brand-mark_cccbeeea.png" alt="رمز محفظتي" className="size-10 object-contain" /><span className="absolute -bottom-1 -left-1 size-2.5 rounded-full border-2 border-[#FFFEFB] bg-[#EEC66B]" /></span>
-            <div>
-              <div className="font-[family-name:var(--font-display)] text-[19px] font-extrabold leading-none tracking-tight text-[#0F5C5B]">محفظتي</div>
-              <div className="mt-1 text-[10px] font-bold tracking-[0.17em] text-[#A66919]">M A H F A Z A T I</div>
-            </div>
-          </div>
-        </div>
+  if (loading && !workspace) return <LoadingScreen />;
+  if (error && !workspace) return <ConnectionScreen error={error} onRetry={() => void refresh()} />;
 
-        <button className="mt-8 flex items-center justify-between rounded-2xl border border-[#D8E6E1] bg-[#F6FAF8] px-3 py-3 text-right hover:bg-[#EDF5F2]" onClick={() => toast.message("ستتم إدارة أفراد المساحة من شاشة الأشخاص قريباً.") }>
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-[#D9EAE5] text-sm font-black text-[#0F5C5B]">م</span>
-            <span>
-              <span className="block text-xs font-bold text-[#254642]">مساحة محمود</span>
-              <span className="mt-0.5 block text-[11px] text-[#66807A]">فضاء مالي عائلي</span>
-            </span>
-          </div>
-          <ChevronDown className="size-4 text-[#66807A]" />
-        </button>
-
-        <nav className="mt-7 space-y-1.5" aria-label="التنقل الرئيسي">
-          <p className="px-3 pb-2 text-[10px] font-extrabold tracking-[0.14em] text-[#8A9B96]">مركز المتابعة</p>
-          {navigation.map((item) => (
-            <NavItem
-              key={item.key}
-              label={item.label}
-              Icon={item.icon}
-              active={activeNav === item.key}
-              onClick={() => { setActiveNav(item.key); setMobileOpen(false); }}
-            />
-          ))}
-        </nav>
-
-        <div className="mt-7 border-t border-[#E7EEEA] pt-5">
-          <p className="px-3 pb-2 text-[10px] font-extrabold tracking-[0.14em] text-[#8A9B96]">إدارة المساحة</p>
-          <NavItem label="الأشخاص والأعضاء" Icon={UsersRound} active={false} onClick={() => toast.message("يمكن دعوة أعضاء بصلاحيات محرّر أو قارئ في النسخة المرتبطة بالخادم.")} />
-          <NavItem label="الإعدادات" Icon={Settings2} active={false} onClick={() => toast.message("إعدادات العملة وسعر الصرف ستكون قابلة للتحرير من هنا.")} />
-        </div>
-
-        <div className="mt-auto rounded-2xl bg-[#103F3E] p-4 text-white">
-          <div className="flex items-center gap-2 text-[#EFCB74]"><ShieldCheck className="size-4" /><span className="text-xs font-bold">مساحة خاصة وآمنة</span></div>
-          <p className="mt-2 text-xs leading-5 text-[#D3E4E1]">الأرصدة تُحتسب من القيود المنشورة، وليست أرقاماً يدوية.</p>
-        </div>
-      </aside>
-
-      {mobileOpen && <button aria-label="تغطية القائمة" className="fixed inset-0 z-30 bg-[#18312E]/30 backdrop-blur-[1px] lg:hidden" onClick={() => setMobileOpen(false)} />}
-
-      <main className="min-h-screen lg:mr-[276px]">
-        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#E1EAE6] bg-[#F8F7F2]/92 px-4 backdrop-blur-xl sm:px-7 lg:px-10">
-          <div className="flex items-center gap-3">
-            <button className="rounded-xl border border-[#DCE8E3] bg-white p-2 text-[#45635D] lg:hidden" onClick={() => setMobileOpen(true)} aria-label="فتح القائمة"><Menu className="size-5" /></button>
-            <div>
-              <p className="text-xs font-medium text-[#7A908B]">الأربعاء، 29 يناير 2025</p>
-              <h1 className="mt-0.5 text-lg font-extrabold text-[#193331]">{currentTitle}</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden items-center rounded-xl border border-[#DCE8E3] bg-white p-1 sm:flex">
-              {(["ILS", "USD"] as Currency[]).map((item) => (
-                <button key={item} onClick={() => setCurrency(item)} className={`rounded-lg px-3 py-1.5 text-xs font-extrabold transition ${currency === item ? "bg-[#E7F1EE] text-[#0F5C5B]" : "text-[#78908B]"}`}>{item}</button>
-              ))}
-            </div>
-            <button className="relative rounded-xl border border-[#DCE8E3] bg-white p-2.5 text-[#54716A] hover:bg-[#EFF5F2]" onClick={() => toast.message("لا توجد تنبيهات جديدة اليوم.")} aria-label="التنبيهات"><Bell className="size-4" /><span className="absolute left-2 top-2 size-1.5 rounded-full bg-[#C98025]" /></button>
-            <button onClick={() => setShowDialog(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,92,91,0.2)] transition hover:bg-[#0B4D4C] active:scale-[0.97] sm:px-4"><Plus className="size-4" /> <span className="hidden sm:inline">تسجيل حركة</span></button>
-          </div>
-        </header>
-
-        <div className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8">
-          {activeNav === "dashboard" && (
-            <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-              <section className="relative overflow-hidden rounded-[24px] bg-[#103F3E] px-5 py-6 text-white shadow-[0_20px_45px_rgba(16,63,62,0.16)] sm:px-7 sm:py-7">
-                <img src="/manus-storage/mahfazati-portfolio-wave_c9166a2f.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-right opacity-55 mix-blend-screen" />
-                <div className="absolute inset-0 bg-gradient-to-l from-[#103F3E]/30 via-[#103F3E]/65 to-[#103F3E]" />
-                <div className="relative grid gap-6 lg:grid-cols-[1fr_260px] lg:items-end">
-                  <div>
-                    <div className="flex items-center gap-2 text-[#EBC56E]"><span className="size-2 animate-pulse rounded-full bg-[#EBC56E]" /><span className="text-xs font-bold">لقطة موحّدة · حتى اليوم</span></div>
-                    <p className="mt-4 text-sm font-medium text-[#C4DAD5]">صافي القيمة الحالي</p>
-                    <div className="mt-1 flex flex-wrap items-end gap-3"><h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl" dir="ltr">{formatMoney(84200, currency)}</h2><span className="mb-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-[#BDE2D5]" dir="ltr">+ 4.8%</span></div>
-                    <p className="mt-3 text-xs text-[#B7CEC9]">يشمل 4 محافظ و6 حسابات · سعر USD/ILS: <span dir="ltr">3.65</span></p>
-                  </div>
-                  <div className="rounded-2xl border border-white/15 bg-[#0B3332]/55 p-4 backdrop-blur-sm">
-                    <p className="text-xs text-[#B7CEC9]">أولوية هذا الأسبوع</p>
-                    <p className="mt-1.5 text-sm font-bold leading-6">استكمال تصنيف 3 حركات وانتظار دفعة مستحقة.</p>
-                    <button onClick={() => setActiveNav("transactions")} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#EBC56E] hover:text-white">استعراض الحركات <ChevronLeft className="size-3.5" /></button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="السيولة المتاحة" value={formatMoney(22340, currency)} hint="+ 1,240 خلال 30 يوماً" tone="teal" icon={WalletCards} />
-                <MetricCard label="رصيد الادخار" value={formatMoney(35400, currency)} hint="42% من صافي القيمة" tone="sage" icon={Landmark} />
-                <MetricCard label="المستحقات لك" value={formatMoney(5290, currency)} hint="دفعتان خلال 14 يوماً" tone="amber" icon={CircleDollarSign} />
-                <MetricCard label="التزامات قادمة" value={formatMoney(3180, currency)} hint="حتى نهاية فبراير" tone="amber" icon={FileText} />
-              </section>
-
-              <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
-                <section className="rounded-2xl border border-[#E0EAE6] bg-white p-5 shadow-[0_8px_20px_rgba(32,66,60,0.035)]">
-                  <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-extrabold">أداء صافي القيمة</p><p className="mt-1 text-xs text-[#78908B]">التقييم بالشيكل · آخر 7 أشهر</p></div><button onClick={() => setActiveNav("reports")} className="rounded-lg border border-[#DCE8E3] px-2.5 py-1.5 text-xs font-bold text-[#0F5C5B] hover:bg-[#EEF5F2]">تفاصيل التقرير</button></div>
-                  <div className="mt-5 h-[250px]" dir="ltr">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData} margin={{ top: 12, right: 4, left: -20, bottom: 0 }}>
-                        <defs><linearGradient id="portfolioFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0F5C5B" stopOpacity={0.26} /><stop offset="100%" stopColor="#0F5C5B" stopOpacity={0.01} /></linearGradient></defs>
-                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#829690", fontSize: 11 }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#829690", fontSize: 11 }} tickFormatter={(value) => `${Math.round(value / 1000)}K`} />
-                        <Tooltip formatter={(value: number) => [formatMoney(value, currency), "صافي القيمة"]} labelStyle={{ direction: "rtl", color: "#193331" }} contentStyle={{ borderRadius: 12, border: "1px solid #DCE8E3", boxShadow: "0 12px 24px rgba(32,66,60,.10)" }} />
-                        <Area type="monotone" dataKey="value" stroke="#0F5C5B" strokeWidth={3} fill="url(#portfolioFill)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-                <section className="relative overflow-hidden rounded-[18px] border-r-4 border-[#0F5C5B] bg-[#F4F8F1] p-5">
-                  <img src="/manus-storage/mahfazati-exchange-flow_5ee4d0df.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-[0.17]" />
-                  <div className="relative"><div className="flex items-center justify-between"><div><p className="flex items-center gap-1.5 text-[11px] font-bold text-[#0F5C5B]"><span className="size-1.5 rounded-full bg-[#0F5C5B]" />نبض القرار</p><p className="mt-1 text-sm font-extrabold text-[#2B4D45]">تدفق يناير</p><p className="mt-1 text-xs text-[#6B837C]">الحركات المنشورة فقط</p></div><SlidersHorizontal className="size-4 text-[#658079]" /></div>
-                  <div className="mt-6 space-y-5"><div><div className="flex justify-between text-xs font-bold"><span>الدخل</span><span dir="ltr" className="text-[#25725A]">{formatMoney(totalIncome, currency)}</span></div><div className="mt-2 h-2 rounded-full bg-[#DCE9DE]"><div className="h-full w-[78%] rounded-full bg-[#3C8B6D]" /></div></div><div><div className="flex justify-between text-xs font-bold"><span>المصروف</span><span dir="ltr" className="text-[#9B604D]">{formatMoney(totalExpense, currency)}</span></div><div className="mt-2 h-2 rounded-full bg-[#E5E9DD]"><div className="h-full w-[34%] rounded-full bg-[#B97857]" /></div></div></div>
-                  <div className="mt-6 border-t border-[#D9E4D7] pt-4"><p className="text-xs text-[#6B837C]">صافي التدفق</p><p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-extrabold text-[#0F5C5B]" dir="ltr">{formatMoney(totalIncome - totalExpense, currency)}</p><div className="mt-4 border-t border-dashed border-[#D2DED0] pt-3"><p className="text-[11px] font-bold text-[#6B837C]">مستحق قريب</p><p className="mt-1 text-xs font-bold text-[#8A5A17]">دفعة بقيمة 1,800 ₪ خلال 4 أيام</p></div></div></div>
-                </section>
-              </div>
-
-              <section className="mt-5 overflow-hidden rounded-2xl border border-[#E0EAE6] bg-white shadow-[0_8px_20px_rgba(32,66,60,0.035)]"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7EFEB] px-5 py-4"><div><h3 className="text-sm font-extrabold">آخر الحركات</h3><p className="mt-1 text-xs text-[#78908B]">سجل قابل للمراجعة من القيود المنشورة</p></div><button onClick={() => setActiveNav("transactions")} className="text-xs font-bold text-[#0F5C5B] hover:underline">كل الحركات</button></div><MovementTable items={movements.slice(0, 4)} currency={currency} compact /></section>
-            </div>
-          )}
-
-          {activeNav === "transactions" && <TransactionsView currency={currency} query={query} setQuery={setQuery} movements={visibleMovements} onExport={exportCsv} onAdd={() => setShowDialog(true)} />}
-          {activeNav === "reports" && <ReportsView currency={currency} onExport={exportCsv} />}
-          {(activeNav === "portfolios" || activeNav === "accounts") && <ManagementView type={activeNav} currency={currency} onAdd={() => setShowDialog(true)} />}
-        </div>
-      </main>
-
-      {showDialog && <TransactionDialog draft={draft} setDraft={setDraft} onClose={() => setShowDialog(false)} onSubmit={addMovement} />}
-    </div>
-  );
+  return <div className="min-h-screen bg-[#F8F7F2] text-[#193331]" dir="rtl">
+    <aside className={`fixed inset-y-0 right-0 z-40 flex w-[276px] flex-col border-l border-[#DCE8E3] bg-[#FFFEFB] px-4 py-5 transition-transform duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "translate-x-full"}`}><div className="flex items-center justify-between px-2"><button onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-[#5F7773] hover:bg-[#EFF4F1] lg:hidden" aria-label="إغلاق القائمة"><X className="size-5" /></button><div className="mr-auto flex items-center gap-2.5"><span className="relative flex size-12 items-center justify-center rounded-2xl bg-[#E7F1EE] shadow-[inset_0_0_0_1px_rgba(15,92,91,.12)]"><img src="/manus-storage/mahfazati-brand-mark_cccbeeea.png" alt="رمز محفظتي" className="size-10 object-contain" /><span className="absolute -bottom-1 -left-1 size-2.5 rounded-full border-2 border-[#FFFEFB] bg-[#EEC66B]" /></span><div><div className="font-[family-name:var(--font-display)] text-[19px] font-extrabold leading-none tracking-tight text-[#0F5C5B]">محفظتي</div><div className="mt-1 text-[10px] font-bold tracking-[0.17em] text-[#A66919]">M A H F A Z A T I</div></div></div></div>
+      <button className="mt-8 flex items-center justify-between rounded-2xl border border-[#D8E6E1] bg-[#F6FAF8] px-3 py-3 text-right hover:bg-[#EDF5F2]" onClick={() => toast.message("يمكن تبديل مساحة العمل من واجهة الخادم عند إضافة أكثر من مساحة.")}><div className="flex items-center gap-2.5"><span className="flex size-8 items-center justify-center rounded-xl bg-[#D9EAE5] text-sm font-black text-[#0F5C5B]">{workspace?.workspace.name.slice(0, 1) ?? "م"}</span><span><span className="block text-xs font-bold text-[#254642]">{workspace?.workspace.name ?? "مساحتي"}</span><span className="mt-0.5 block text-[11px] text-[#66807A]">بيانات مرتبطة بـ Django</span></span></div><ChevronDown className="size-4 text-[#66807A]" /></button>
+      <nav className="mt-7 space-y-1.5" aria-label="التنقل الرئيسي"><p className="px-3 pb-2 text-[10px] font-extrabold tracking-[0.14em] text-[#8A9B96]">مركز المتابعة</p>{navigation.map((item) => <NavItem key={item.key} label={item.label} Icon={item.icon} active={activeNav === item.key} onClick={() => { setActiveNav(item.key); setMobileOpen(false); }} />)}</nav><div className="mt-7 border-t border-[#E7EEEA] pt-5"><p className="px-3 pb-2 text-[10px] font-extrabold tracking-[0.14em] text-[#8A9B96]">إدارة المساحة</p><NavItem label="الأشخاص والأعضاء" Icon={UsersRound} active={false} onClick={() => toast.message("صلاحيات القرّاء والمحررين تُطبَّق من Django REST.")} /><NavItem label="الإعدادات" Icon={Settings2} active={false} onClick={() => toast.message("أسعار الصرف متاحة عبر واجهة Django REST.")} /></div><div className="mt-auto rounded-2xl bg-[#103F3E] p-4 text-white"><div className="flex items-center gap-2 text-[#EFCB74]"><ShieldCheck className="size-4" /><span className="text-xs font-bold">مساحة خاصة وآمنة</span></div><p className="mt-2 text-xs leading-5 text-[#D3E4E1]">الرصيد صادر من القيود المنشورة في PostgreSQL.</p></div></aside>
+    {mobileOpen && <button aria-label="تغطية القائمة" className="fixed inset-0 z-30 bg-[#18312E]/30 backdrop-blur-[1px] lg:hidden" onClick={() => setMobileOpen(false)} />}
+    <main className="min-h-screen lg:mr-[276px]"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#E1EAE6] bg-[#F8F7F2]/92 px-4 backdrop-blur-xl sm:px-7 lg:px-10"><div className="flex items-center gap-3"><button className="rounded-xl border border-[#DCE8E3] bg-white p-2 text-[#45635D] lg:hidden" onClick={() => setMobileOpen(true)} aria-label="فتح القائمة"><Menu className="size-5" /></button><div><p className="text-xs font-medium text-[#7A908B]">متصل بواجهة البيانات المالية</p><h1 className="mt-0.5 text-lg font-extrabold text-[#193331]">{currentTitle}</h1></div></div><div className="flex items-center gap-2 sm:gap-3"><div className="hidden items-center rounded-xl border border-[#DCE8E3] bg-white p-1 sm:flex">{(["ILS", "USD"] as FinanceCurrency[]).map((item) => <button key={item} onClick={() => pickCurrency(item)} className={`rounded-lg px-3 py-1.5 text-xs font-extrabold transition ${activeCurrency === item ? "bg-[#E7F1EE] text-[#0F5C5B]" : "text-[#78908B]"}`}>{item}</button>)}</div><button className="relative rounded-xl border border-[#DCE8E3] bg-white p-2.5 text-[#54716A] hover:bg-[#EFF5F2]" onClick={() => void refresh(activeCurrency)} aria-label="تحديث البيانات"><Bell className="size-4" /><span className="absolute left-2 top-2 size-1.5 rounded-full bg-[#2D8A64]" /></button><button onClick={() => setShowDialog(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,92,91,0.2)] transition hover:bg-[#0B4D4C] active:scale-[0.97] sm:px-4"><Plus className="size-4" /><span className="hidden sm:inline">تسجيل حركة</span></button></div></header>
+      <div className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8">{error && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ECD8AC] bg-[#FFF9ED] px-4 py-3 text-sm text-[#805112]"><span>{error.message}</span><button onClick={() => void refresh(activeCurrency)} className="font-bold underline">إعادة المحاولة</button></div>}
+        {activeNav === "dashboard" && <Dashboard workspace={workspace} accounts={accounts} transactions={transactions} cashFlow={cashFlow} netWorth={netWorth} currency={activeCurrency} liquidBalance={liquidBalance} savingsBalance={savingsBalance} trendData={trendData} onTransactions={() => setActiveNav("transactions")} />}
+        {activeNav === "transactions" && <TransactionsView currency={activeCurrency} query={query} setQuery={setQuery} items={visibleTransactions} onExport={exportCsv} onAdd={() => setShowDialog(true)} />}
+        {activeNav === "reports" && <ReportsView currency={activeCurrency} cashFlow={cashFlow} onExport={exportCsv} />}
+        {activeNav === "portfolios" && <ManagementView type="portfolios" currency={activeCurrency} items={portfolios} onAdd={() => toast.message("إضافة المحافظ متاحة عبر نقطة portfolios في Django REST.")} />}
+        {activeNav === "accounts" && <ManagementView type="accounts" currency={activeCurrency} items={accounts} onAdd={() => toast.message("إضافة الحسابات متاحة عبر نقطة accounts في Django REST.")} />}
+      </div></main>{showDialog && <TransactionDialog accounts={accounts} currency={activeCurrency} onClose={() => setShowDialog(false)} onSubmit={async (payload) => { try { await createAndPostTransaction(payload); setShowDialog(false); toast.success("تم ترحيل الحركة وتحديث الأرصدة من الخادم."); } catch (nextError) { toast.error(nextError instanceof Error ? nextError.message : "تعذر ترحيل الحركة."); } }} />}
+  </div>;
 }
 
-function MovementTable({ items, currency, compact = false }: { items: Movement[]; currency: Currency; compact?: boolean }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right"><thead className="bg-[#FAFCFB] text-[11px] font-bold text-[#8A9B96]"><tr><th className="px-5 py-3 font-bold">الحركة</th><th className="px-4 py-3 font-bold">الحساب</th><th className="px-4 py-3 font-bold">التاريخ</th>{!compact && <th className="px-4 py-3 font-bold">الحالة</th>}<th className="px-5 py-3 text-left font-bold">المبلغ</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-t border-[#EDF2F0] text-sm hover:bg-[#FBFDFC]"><td className="px-5 py-3.5"><div className="flex items-center gap-3"><span className="flex size-8 items-center justify-center rounded-xl bg-[#F2F6F4]"><MovementIcon kind={item.kind} /></span><div><p className="font-bold text-[#254642]">{item.title}</p><p className="mt-0.5 text-xs text-[#80938F]">{item.category}</p></div></div></td><td className="px-4 py-3.5 text-xs font-medium text-[#536D67]">{item.account}</td><td className="px-4 py-3.5 text-xs text-[#6E8580]">{item.date}</td>{!compact && <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>}<td className={`px-5 py-3.5 text-left text-sm font-extrabold ${item.kind === "income" ? "text-[#28775E]" : item.kind === "expense" ? "text-[#A55E4B]" : "text-[#367694]"}`} dir="ltr">{item.kind === "income" ? "+" : item.kind === "expense" ? "−" : "↔"} {formatMoney(item.amount, currency)}</td></tr>)}</tbody></table></div>;
-}
+function LoadingScreen() { return <div className="flex min-h-screen items-center justify-center bg-[#F8F7F2]" dir="rtl"><div className="text-center"><LoaderCircle className="mx-auto size-8 animate-spin text-[#0F5C5B]" /><p className="mt-4 text-sm font-bold text-[#43645E]">يجري تحميل مساحة العمل من Django…</p></div></div>; }
+function ConnectionScreen({ error, onRetry }: { error: FinanceApiError; onRetry: () => void }) { const login = error.status === 401; return <div className="flex min-h-screen items-center justify-center bg-[#F8F7F2] p-5" dir="rtl"><section className="w-full max-w-md rounded-[22px] border border-[#DCE8E3] bg-white p-7 text-center shadow-[0_18px_45px_rgba(32,66,60,.08)]"><img src="/manus-storage/mahfazati-brand-mark_cccbeeea.png" alt="محفظتي" className="mx-auto size-14" /><h1 className="mt-5 text-xl font-extrabold">{login ? "يلزم تسجيل الدخول" : "تعذر الوصول للخادم المالي"}</h1><p className="mt-3 text-sm leading-6 text-[#6B837C]">{login ? "سجّل الدخول بحسابك في Django للوصول إلى مساحة عملك الخاصة." : error.message}</p>{login ? <a href={getFinanceLoginUrl()} className="mt-6 inline-flex rounded-xl bg-[#0F5C5B] px-4 py-2.5 text-sm font-bold text-white">الانتقال لتسجيل الدخول</a> : <button onClick={onRetry} className="mt-6 rounded-xl bg-[#0F5C5B] px-4 py-2.5 text-sm font-bold text-white">إعادة المحاولة</button>}</section></div>; }
 
-function TransactionsView({ currency, query, setQuery, movements, onExport, onAdd }: { currency: Currency; query: string; setQuery: (value: string) => void; movements: Movement[]; onExport: () => void; onAdd: () => void }) {
-  return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-[#6F8681]">دفتر الحركات الديناميكي</p><h2 className="mt-1 text-2xl font-extrabold">كل الحركات</h2></div><div className="flex gap-2"><button onClick={onExport} className="inline-flex items-center gap-2 rounded-xl border border-[#D8E5E0] bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F5C5B] hover:bg-[#EFF5F2]"><Download className="size-4" />تصدير CSV</button><button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-xs font-bold text-white"><Plus className="size-4" />حركة جديدة</button></div></div><div className="mt-6 rounded-2xl border border-[#E0EAE6] bg-white"><div className="flex flex-wrap gap-3 border-b border-[#E7EFEB] p-4"><label className="relative min-w-[220px] flex-1"><Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#78908B]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث في الوصف أو الحساب..." className="h-10 w-full rounded-xl border border-[#DCE8E3] bg-[#FCFDFC] pr-9 pl-3 text-sm outline-none transition focus:border-[#0F5C5B]" /></label><button className="inline-flex items-center gap-2 rounded-xl border border-[#DCE8E3] px-3 text-xs font-bold text-[#54716A] hover:bg-[#F3F7F5]"><SlidersHorizontal className="size-4" />فلاتر</button></div><MovementTable items={movements} currency={currency} /></div></section>;
-}
-
-function ReportsView({ currency, onExport }: { currency: Currency; onExport: () => void }) {
-  const cards = [{ label: "إجمالي الدخل", value: 11050, tone: "bg-[#EDF8F3] text-[#2D785E]" }, { label: "إجمالي المصروف", value: 1240, tone: "bg-[#FFF4EF] text-[#A8604C]" }, { label: "صافي التدفق", value: 9810, tone: "bg-[#EAF4F2] text-[#0F5C5B]" }];
-  return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-[#6F8681]">يناير 2025 · كل المحافظ</p><h2 className="mt-1 text-2xl font-extrabold">تقرير التدفق النقدي</h2></div><button onClick={onExport} className="inline-flex items-center gap-2 rounded-xl border border-[#D8E5E0] bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F5C5B]"><Download className="size-4" />تصدير التقرير</button></div><div className="mt-6 grid gap-4 md:grid-cols-3">{cards.map((card) => <div key={card.label} className={`rounded-2xl p-5 ${card.tone}`}><p className="text-xs font-bold opacity-75">{card.label}</p><p className="mt-3 text-2xl font-extrabold" dir="ltr">{formatMoney(card.value, currency)}</p><p className="mt-2 text-xs opacity-70">الحركات المنشورة خلال الفترة</p></div>)}</div><div className="mt-5 grid gap-5 lg:grid-cols-[1.3fr_.7fr]"><div className="overflow-hidden rounded-2xl border border-[#E0EAE6] bg-white"><div className="border-b border-[#E7EFEB] p-5"><h3 className="text-sm font-extrabold">ملخص حسب الفئة</h3></div><div className="space-y-5 p-5">{[["دخل العمل", 76, "#278064"],["المنزل", 34, "#BF7958"],["تنقّل", 21, "#BE9140"],["الادخار", 48, "#3F8099"]].map(([label, width, color]) => <div key={String(label)}><div className="mb-2 flex justify-between text-xs font-bold"><span>{label}</span><span>{width}%</span></div><div className="h-2 rounded-full bg-[#EEF3F1]"><div className="h-full rounded-full" style={{ width: `${width}%`, background: String(color) }} /></div></div>)}</div></div><div className="relative overflow-hidden rounded-2xl bg-[#0F5C5B] p-6 text-white"><img src="/manus-storage/mahfazati-family-vault_570135b9.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-screen" /><div className="relative"><p className="text-xs font-bold text-[#EFCB74]">تقرير ذكي</p><h3 className="mt-2 text-xl font-extrabold leading-8">الادخار يتقدم بثبات هذا الشهر.</h3><p className="mt-3 text-sm leading-6 text-[#C8DFD9]">أضفت تحويلاً داخلياً بقيمة 1,500 ₪، فارتفعت نسبة الادخار إلى 42% من صافي القيمة.</p><button onClick={() => toast.message("سيكون تقرير الأداء الزمني قابلاً للتخصيص من إعدادات التقارير.")} className="mt-6 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/20">تخصيص التقرير</button></div></div></div></section>;
-}
-
-function ManagementView({ type, currency, onAdd }: { type: "portfolios" | "accounts"; currency: Currency; onAdd: () => void }) {
-  const items = type === "portfolios" ? [{ name: "المحفظة اليومية", desc: "محمود · عملتها الأساسية ILS", value: 22340, color: "#0F5C5B" }, { name: "محفظة الادخار", desc: "محمود · هدف طويل الأجل", value: 35400, color: "#52714E" }, { name: "محفظة الدولار", desc: "العائلة · عملتها الأساسية USD", value: 26460, color: "#B27B2A" }] : [{ name: "البنك العربي", desc: "حساب جارٍ · ILS", value: 12800, color: "#0F5C5B" }, { name: "حساب الادخار", desc: "ادخار · ILS", value: 35400, color: "#52714E" }, { name: "Visa Platinum", desc: "بطاقة ائتمان · ILS", value: -780, color: "#B6614B" }];
-  return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex items-end justify-between"><div><p className="text-sm text-[#6F8681]">تكوين مساحة محمود</p><h2 className="mt-1 text-2xl font-extrabold">{type === "portfolios" ? "المحافظ" : "الحسابات"}</h2></div><button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-xs font-bold text-white"><Plus className="size-4" />إضافة {type === "portfolios" ? "محفظة" : "حساب"}</button></div><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.name} className="relative overflow-hidden rounded-2xl border border-[#E0EAE6] bg-white p-5 shadow-[0_8px_20px_rgba(32,66,60,0.035)]"><span className="absolute inset-y-0 right-0 w-1" style={{ background: item.color }} /><div className="flex items-start justify-between"><span className="rounded-xl p-2.5" style={{ background: `${item.color}16`, color: item.color }}><WalletCards className="size-5" /></span><button className="rounded-lg p-1.5 text-[#8A9B96] hover:bg-[#F0F5F2]"><MoreHorizontal className="size-5" /></button></div><h3 className="mt-6 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-xs text-[#78908B]">{item.desc}</p><div className="mt-6 border-t border-[#EEF2F0] pt-4"><p className="text-xs text-[#78908B]">الرصيد الحالي</p><p className="mt-1 text-xl font-extrabold" dir="ltr">{formatMoney(item.value, currency)}</p></div></article>)}</div></section>;
-}
-
-function TransactionDialog({ draft, setDraft, onClose, onSubmit }: { draft: { title: string; amount: string; kind: Movement["kind"] }; setDraft: (value: { title: string; amount: string; kind: Movement["kind"] }) => void; onClose: () => void; onSubmit: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#18312E]/35 p-4 backdrop-blur-sm sm:items-center"><div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-200 rounded-[22px] bg-[#FFFEFB] p-5 shadow-2xl"><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-[#78908B]">دفتر الحركات</p><h2 className="mt-1 text-lg font-extrabold">تسجيل حركة جديدة</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[#6E8580] hover:bg-[#EFF4F1]" aria-label="إغلاق"><X className="size-5" /></button></div><div className="mt-5 space-y-4"><label className="block text-xs font-bold text-[#45635D]">نوع الحركة<div className="mt-2 grid grid-cols-3 rounded-xl bg-[#F1F5F3] p-1">{([['income','دخل'],['expense','مصروف'],['transfer','تحويل']] as const).map(([value,label]) => <button key={value} onClick={() => setDraft({ ...draft, kind: value })} className={`rounded-lg px-2 py-2 text-xs font-bold transition ${draft.kind === value ? "bg-white text-[#0F5C5B] shadow-sm" : "text-[#78908B]"}`}>{label}</button>)}</div></label><label className="block text-xs font-bold text-[#45635D]">الوصف<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="مثال: فاتورة الكهرباء" className="mt-2 h-11 w-full rounded-xl border border-[#DCE8E3] bg-white px-3 text-sm font-medium outline-none focus:border-[#0F5C5B]" /></label><label className="block text-xs font-bold text-[#45635D]">المبلغ<input inputMode="decimal" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} placeholder="0" className="mt-2 h-11 w-full rounded-xl border border-[#DCE8E3] bg-white px-3 text-sm font-medium outline-none focus:border-[#0F5C5B]" dir="ltr" /></label></div><div className="mt-6 flex gap-2"><button onClick={onClose} className="flex-1 rounded-xl border border-[#D8E5E0] py-2.5 text-sm font-bold text-[#54716A] hover:bg-[#F3F7F5]">إلغاء</button><button onClick={onSubmit} className="flex-1 rounded-xl bg-[#0F5C5B] py-2.5 text-sm font-bold text-white hover:bg-[#0B4D4C] active:scale-[0.97]">ترحيل الحركة</button></div></div></div>;
-}
+function Dashboard({ workspace, accounts, transactions, cashFlow, netWorth, currency, liquidBalance, savingsBalance, trendData, onTransactions }: { workspace: ReturnType<typeof useFinanceData>["workspace"]; accounts: FinanceAccount[]; transactions: FinanceTransaction[]; cashFlow: ReturnType<typeof useFinanceData>["cashFlow"]; netWorth: ReturnType<typeof useFinanceData>["netWorth"]; currency: FinanceCurrency; liquidBalance: number; savingsBalance: number; trendData: Array<{ label: string; value: number }>; onTransactions: () => void }) { return <div className="animate-in fade-in slide-in-from-bottom-1 duration-300"><section className="relative overflow-hidden rounded-[24px] bg-[#103F3E] px-5 py-6 text-white shadow-[0_20px_45px_rgba(16,63,62,0.16)] sm:px-7 sm:py-7"><img src="/manus-storage/mahfazati-portfolio-wave_c9166a2f.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-right opacity-55 mix-blend-screen" /><div className="absolute inset-0 bg-gradient-to-l from-[#103F3E]/30 via-[#103F3E]/65 to-[#103F3E]" /><div className="relative grid gap-6 lg:grid-cols-[1fr_260px] lg:items-end"><div><div className="flex items-center gap-2 text-[#EBC56E]"><span className="size-2 animate-pulse rounded-full bg-[#EBC56E]" /><span className="text-xs font-bold">لقطة موحّدة · بيانات حية</span></div><p className="mt-4 text-sm font-medium text-[#C4DAD5]">صافي القيمة الحالي</p><div className="mt-1 flex flex-wrap items-end gap-3"><h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl" dir="ltr">{money(netWorth?.net_worth ?? 0, currency)}</h2></div><p className="mt-3 text-xs text-[#B7CEC9]">{workspace?.account_count ?? accounts.length} حسابات مرتبطة · العملة الأساسية {workspace?.workspace.default_currency ?? currency}</p></div><div className="rounded-2xl border border-white/15 bg-[#0B3332]/55 p-4 backdrop-blur-sm"><p className="text-xs text-[#B7CEC9]">دفتر القيود</p><p className="mt-1.5 text-sm font-bold leading-6">{transactions.filter((item) => item.status === "draft").length ? "هناك حركات مسودة تنتظر الترحيل." : "كل الحركات الظاهرة مرّحلة أو مؤرشفة."}</p><button onClick={onTransactions} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#EBC56E] hover:text-white">استعراض الحركات <ChevronLeft className="size-3.5" /></button></div></div></section><section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="السيولة المتاحة" value={money(liquidBalance, currency)} hint={`${accounts.length} حسابات نشطة`} tone="teal" icon={WalletCards} /><MetricCard label="رصيد الادخار" value={money(savingsBalance, currency)} hint="محسوب من القيود المنشورة" tone="sage" icon={Landmark} /><MetricCard label="الدخل ضمن الفترة" value={money(cashFlow?.income ?? 0, currency)} hint="تقرير التدفق النقدي" tone="teal" icon={CircleDollarSign} /><MetricCard label="المصروف ضمن الفترة" value={money(cashFlow?.expense ?? 0, currency)} hint="الحركات المنشورة فقط" tone="amber" icon={FileText} /></section><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><section className="rounded-2xl border border-[#E0EAE6] bg-white p-5 shadow-[0_8px_20px_rgba(32,66,60,0.035)]"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-extrabold">التدفق التراكمي</p><p className="mt-1 text-xs text-[#78908B]">مستمد من الحركات المنشورة</p></div></div><div className="mt-5 h-[250px]" dir="ltr">{trendData.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={trendData} margin={{ top: 12, right: 4, left: -20, bottom: 0 }}><defs><linearGradient id="portfolioFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0F5C5B" stopOpacity={0.26} /><stop offset="100%" stopColor="#0F5C5B" stopOpacity={0.01} /></linearGradient></defs><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#829690", fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "#829690", fontSize: 11 }} /><Tooltip formatter={(value: number) => [money(value, currency), "التدفق"]} /><Area type="monotone" dataKey="value" stroke="#0F5C5B" strokeWidth={3} fill="url(#portfolioFill)" /></AreaChart></ResponsiveContainer> : <div className="flex h-full items-center justify-center text-sm text-[#78908B]">أضف حركات منشورة لعرض الاتجاه الزمني.</div>}</div></section><section className="relative overflow-hidden rounded-[18px] border-r-4 border-[#0F5C5B] bg-[#F4F8F1] p-5"><img src="/manus-storage/mahfazati-exchange-flow_5ee4d0df.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-[0.17]" /><div className="relative"><div className="flex items-center justify-between"><div><p className="flex items-center gap-1.5 text-[11px] font-bold text-[#0F5C5B]"><span className="size-1.5 rounded-full bg-[#0F5C5B]" />نبض القرار</p><p className="mt-1 text-sm font-extrabold text-[#2B4D45]">تدفق نقدي</p><p className="mt-1 text-xs text-[#6B837C]">مجموع محكوم بالخادم</p></div><SlidersHorizontal className="size-4 text-[#658079]" /></div><div className="mt-6 space-y-5"><FlowRow label="الدخل" value={Number(cashFlow?.income ?? 0)} max={Math.max(Number(cashFlow?.income ?? 0), Number(cashFlow?.expense ?? 0), 1)} color="#3C8B6D" currency={currency} /><FlowRow label="المصروف" value={Number(cashFlow?.expense ?? 0)} max={Math.max(Number(cashFlow?.income ?? 0), Number(cashFlow?.expense ?? 0), 1)} color="#B97857" currency={currency} /></div><div className="mt-6 border-t border-[#D9E4D7] pt-4"><p className="text-xs text-[#6B837C]">صافي التدفق</p><p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-extrabold text-[#0F5C5B]" dir="ltr">{money(cashFlow?.net_cash_flow ?? 0, currency)}</p></div></div></section></div><section className="mt-5 overflow-hidden rounded-2xl border border-[#E0EAE6] bg-white shadow-[0_8px_20px_rgba(32,66,60,0.035)]"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7EFEB] px-5 py-4"><div><h3 className="text-sm font-extrabold">آخر الحركات</h3><p className="mt-1 text-xs text-[#78908B]">سجل مرجعي من PostgreSQL</p></div><button onClick={onTransactions} className="text-xs font-bold text-[#0F5C5B] hover:underline">كل الحركات</button></div><MovementTable items={transactions.slice(0, 4)} currency={currency} compact /></section></div>; }
+function FlowRow({ label, value, max, color, currency }: { label: string; value: number; max: number; color: string; currency: FinanceCurrency }) { return <div><div className="flex justify-between text-xs font-bold"><span>{label}</span><span dir="ltr" style={{ color }}>{money(value, currency)}</span></div><div className="mt-2 h-2 rounded-full bg-[#E5E9DD]"><div className="h-full rounded-full" style={{ width: `${Math.max(5, (value / max) * 100)}%`, background: color }} /></div></div>; }
+function MovementTable({ items, currency, compact = false }: { items: FinanceTransaction[]; currency: FinanceCurrency; compact?: boolean }) { return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right"><thead className="bg-[#FAFCFB] text-[11px] font-bold text-[#8A9B96]"><tr><th className="px-5 py-3 font-bold">الحركة</th><th className="px-4 py-3 font-bold">الحساب</th><th className="px-4 py-3 font-bold">التاريخ</th>{!compact && <th className="px-4 py-3 font-bold">الحالة</th>}<th className="px-5 py-3 text-left font-bold">المبلغ</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-t border-[#EDF2F0] text-sm hover:bg-[#FBFDFC]"><td className="px-5 py-3.5"><div className="flex items-center gap-3"><span className="flex size-8 items-center justify-center rounded-xl bg-[#F2F6F4]"><MovementIcon kind={item.kind} /></span><div><p className="font-bold text-[#254642]">{item.description}</p><p className="mt-0.5 text-xs text-[#80938F]">{item.category_name ?? (item.kind === "transfer" ? "تحويل داخلي" : "غير مصنفة")}</p></div></div></td><td className="px-4 py-3.5 text-xs font-medium text-[#536D67]">{item.source_account_name ?? item.destination_account_name ?? "—"}</td><td className="px-4 py-3.5 text-xs text-[#6E8580]">{labelDate(item.occurred_on)}</td>{!compact && <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>}<td className={`px-5 py-3.5 text-left text-sm font-extrabold ${item.kind === "income" ? "text-[#28775E]" : item.kind === "expense" ? "text-[#A55E4B]" : "text-[#367694]"}`} dir="ltr">{item.kind === "income" ? "+" : item.kind === "expense" ? "−" : "↔"} {money(item.amount, currency)}</td></tr>)}</tbody></table></div>; }
+function TransactionsView({ currency, query, setQuery, items, onExport, onAdd }: { currency: FinanceCurrency; query: string; setQuery: (value: string) => void; items: FinanceTransaction[]; onExport: () => void; onAdd: () => void }) { return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-[#6F8681]">دفتر الحركات من Django REST</p><h2 className="mt-1 text-2xl font-extrabold">كل الحركات</h2></div><div className="flex gap-2"><button onClick={onExport} className="inline-flex items-center gap-2 rounded-xl border border-[#D8E5E0] bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F5C5B] hover:bg-[#EFF5F2]"><Download className="size-4" />تصدير CSV</button><button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-xs font-bold text-white"><Plus className="size-4" />حركة جديدة</button></div></div><div className="mt-6 rounded-2xl border border-[#E0EAE6] bg-white"><div className="flex flex-wrap gap-3 border-b border-[#E7EFEB] p-4"><label className="relative min-w-[220px] flex-1"><Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#78908B]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث في الوصف أو الحساب..." className="h-10 w-full rounded-xl border border-[#DCE8E3] bg-[#FCFDFC] pr-9 pl-3 text-sm outline-none transition focus:border-[#0F5C5B]" /></label><button className="inline-flex items-center gap-2 rounded-xl border border-[#DCE8E3] px-3 text-xs font-bold text-[#54716A] hover:bg-[#F3F7F5]"><SlidersHorizontal className="size-4" />{items.length} نتيجة</button></div><MovementTable items={items} currency={currency} /></div></section>; }
+function ReportsView({ currency, cashFlow, onExport }: { currency: FinanceCurrency; cashFlow: ReturnType<typeof useFinanceData>["cashFlow"]; onExport: () => void }) { const cards = [{ label: "إجمالي الدخل", value: cashFlow?.income ?? "0", tone: "bg-[#EDF8F3] text-[#2D785E]" }, { label: "إجمالي المصروف", value: cashFlow?.expense ?? "0", tone: "bg-[#FFF4EF] text-[#A8604C]" }, { label: "صافي التدفق", value: cashFlow?.net_cash_flow ?? "0", tone: "bg-[#EAF4F2] text-[#0F5C5B]" }]; return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-[#6F8681]">نتيجة الحركات المنشورة</p><h2 className="mt-1 text-2xl font-extrabold">تقرير التدفق النقدي</h2></div><button onClick={onExport} className="inline-flex items-center gap-2 rounded-xl border border-[#D8E5E0] bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F5C5B]"><Download className="size-4" />تصدير التقرير</button></div><div className="mt-6 grid gap-4 md:grid-cols-3">{cards.map((card) => <div key={card.label} className={`rounded-2xl p-5 ${card.tone}`}><p className="text-xs font-bold opacity-75">{card.label}</p><p className="mt-3 text-2xl font-extrabold" dir="ltr">{money(card.value, currency)}</p><p className="mt-2 text-xs opacity-70">من API الخادم</p></div>)}</div></section>; }
+function ManagementView({ type, currency, items, onAdd }: { type: "portfolios" | "accounts"; currency: FinanceCurrency; items: FinancePortfolio[] | FinanceAccount[]; onAdd: () => void }) { return <section className="animate-in fade-in slide-in-from-bottom-1 duration-300"><div className="flex items-end justify-between"><div><p className="text-sm text-[#6F8681]">تكوين مساحة العمل</p><h2 className="mt-1 text-2xl font-extrabold">{type === "portfolios" ? "المحافظ" : "الحسابات"}</h2></div><button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-[#0F5C5B] px-3.5 py-2.5 text-xs font-bold text-white"><Plus className="size-4" />إضافة {type === "portfolios" ? "محفظة" : "حساب"}</button></div><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => { const balance = "current_balance" in item ? item.current_balance : "0"; const description = "person_name" in item ? `${item.person_name} · ${item.base_currency}` : `${item.portfolio_name} · ${item.currency}`; return <article key={item.id} className="relative overflow-hidden rounded-2xl border border-[#E0EAE6] bg-white p-5 shadow-[0_8px_20px_rgba(32,66,60,0.035)]"><span className="absolute inset-y-0 right-0 w-1 bg-[#0F5C5B]" /><div className="flex items-start justify-between"><span className="rounded-xl bg-[#EAF4F2] p-2.5 text-[#0F5C5B]"><WalletCards className="size-5" /></span><MoreHorizontal className="size-5 text-[#8A9B96]" /></div><h3 className="mt-6 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-xs text-[#78908B]">{description}</p><div className="mt-6 border-t border-[#EEF2F0] pt-4"><p className="text-xs text-[#78908B]">الرصيد الحالي</p><p className="mt-1 text-xl font-extrabold" dir="ltr">{money(balance, currency)}</p></div></article>; })}</div></section>; }
+function TransactionDialog({ accounts, currency, onClose, onSubmit }: { accounts: FinanceAccount[]; currency: FinanceCurrency; onClose: () => void; onSubmit: (payload: { kind: TransactionKind; description: string; amount: string; currency: FinanceCurrency; source_account?: number; destination_account?: number }) => Promise<void> }) { const [kind, setKind] = useState<TransactionKind>("expense"); const [description, setDescription] = useState(""); const [amount, setAmount] = useState(""); const [source, setSource] = useState(""); const [destination, setDestination] = useState(""); const [saving, setSaving] = useState(false); const submit = async () => { if (!description.trim() || !Number(amount)) return toast.error("أدخل وصفاً ومبلغاً موجباً."); if ((kind === "expense" || kind === "transfer") && !source) return toast.error("اختر الحساب المصدر."); if ((kind === "income" || kind === "transfer") && !destination) return toast.error("اختر الحساب المستلم."); setSaving(true); try { await onSubmit({ kind, description, amount, currency, ...(source ? { source_account: Number(source) } : {}), ...(destination ? { destination_account: Number(destination) } : {}) }); } finally { setSaving(false); } }; const accountOptions = accounts.filter((account) => account.currency === currency && !account.is_archived); return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#18312E]/35 p-4 backdrop-blur-sm sm:items-center"><div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-200 rounded-[22px] bg-[#FFFEFB] p-5 shadow-2xl"><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-[#78908B]">دفتر الحركات</p><h2 className="mt-1 text-lg font-extrabold">تسجيل حركة جديدة</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[#6E8580] hover:bg-[#EFF4F1]" aria-label="إغلاق"><X className="size-5" /></button></div><div className="mt-5 space-y-4"><label className="block text-xs font-bold text-[#45635D]">نوع الحركة<div className="mt-2 grid grid-cols-3 rounded-xl bg-[#F1F5F3] p-1">{([['income','دخل'],['expense','مصروف'],['transfer','تحويل']] as const).map(([value,label]) => <button key={value} onClick={() => setKind(value)} className={`rounded-lg px-2 py-2 text-xs font-bold transition ${kind === value ? "bg-white text-[#0F5C5B] shadow-sm" : "text-[#78908B]"}`}>{label}</button>)}</div></label><label className="block text-xs font-bold text-[#45635D]">الوصف<input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="مثال: فاتورة الكهرباء" className="mt-2 h-11 w-full rounded-xl border border-[#DCE8E3] bg-white px-3 text-sm font-medium outline-none focus:border-[#0F5C5B]" /></label><label className="block text-xs font-bold text-[#45635D]">المبلغ<input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="mt-2 h-11 w-full rounded-xl border border-[#DCE8E3] bg-white px-3 text-sm font-medium outline-none focus:border-[#0F5C5B]" dir="ltr" /></label>{(kind === "expense" || kind === "transfer") && <AccountSelect label="من حساب" value={source} setValue={setSource} accounts={accountOptions} />}{(kind === "income" || kind === "transfer") && <AccountSelect label="إلى حساب" value={destination} setValue={setDestination} accounts={accountOptions} />}</div><div className="mt-6 flex gap-2"><button onClick={onClose} className="flex-1 rounded-xl border border-[#D8E5E0] py-2.5 text-sm font-bold text-[#54716A] hover:bg-[#F3F7F5]">إلغاء</button><button disabled={saving} onClick={() => void submit()} className="flex-1 rounded-xl bg-[#0F5C5B] py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "جارٍ الترحيل…" : "ترحيل الحركة"}</button></div></div></div>; }
+function AccountSelect({ label, value, setValue, accounts }: { label: string; value: string; setValue: (value: string) => void; accounts: FinanceAccount[] }) { return <label className="block text-xs font-bold text-[#45635D]">{label}<select value={value} onChange={(event) => setValue(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#DCE8E3] bg-white px-3 text-sm outline-none focus:border-[#0F5C5B]"><option value="">اختر حساباً</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>; }
