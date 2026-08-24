@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>تسجيل الدخول | محفظتي</title></head>
+  <body style="font-family:Arial,sans-serif;background:#f8f7f2;color:#193331;margin:0;display:grid;min-height:100vh;place-items:center">
+    <main style="background:#fffefb;border:1px solid #dce8e3;border-radius:18px;padding:32px;width:min(390px,calc(100% - 48px));box-sizing:border-box">
+      <h1 style="margin:0;color:#0f5c5b;font-size:25px">محفظتي</h1><p style="color:#6b837c;line-height:1.6">سجل دخولك للوصول إلى مساحة العمل المالية الخاصة بك.</p>
+      {% if form.errors %}<p style="color:#a8604c">بيانات الدخول غير صحيحة.</p>{% endif %}
+      <form method="post">{% csrf_token %}
+        <label style="display:block;margin:14px 0 6px">اسم المستخدم</label>{{ form.username }}
+        <label style="display:block;margin:14px 0 6px">كلمة المرور</label>{{ form.password }}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <button type="submit" style="margin-top:22px;width:100%;border:0;border-radius:10px;padding:12px;background:#0f5c5b;color:white;font-weight:700;cursor:pointer">تسجيل الدخول</button>
+      </form>
+    </main>
+  </body>
+</html>
