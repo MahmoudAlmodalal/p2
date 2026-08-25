@@ -10,9 +10,9 @@ from django.utils import timezone
 class BaseModel(models.Model):
     """Small local base model kept explicit to make the finance service portable."""
 
-    id = models.AutoField(primary_key=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id = models.AutoField(primary_key=True, serialize=False, help_text="Unique identifier for this record")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when this record was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when this record was last updated")
 
     class Meta:
         abstract = True
